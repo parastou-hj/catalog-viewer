@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نمایشگر کاتالوگ - طرح کتاب</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
+            background: radial-gradient(ellipse at center, #2c3e50 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            direction: rtl;
+            overflow: hidden;
+        }
+
+        /* Background Pattern */
+        body::before {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.05) 35px, rgba(255,255,255,.05) 70px);
+            pointer-events: none;
+        }
+
+        /* Main Book Container */
+        .book-container {
+            position: relative;
+            width: 90vw;
+            max-width: 1200px;
+            height: 80vh;
+            max-height: 700px;
+            perspective: 2000px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Book Wrapper */
+        .book {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-style: preserve-3d;
+        }
+
+        /* Book Pages Container */
+        .pages-container {
+            position: relative;
+            width: 90%;
+            height: 90%;
+            display: flex;
+            gap: 4px;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+        }
+
+        /* Individual Page */
+        .page {
+            flex: 1;
+            background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.6s cubic-bezier(0.645, 0.045, 0.355, 1);
+            transform-origin: center;
+            cursor: pointer;
+        }
+
+        .page.left {
+            box-shadow: inset -10px 0 30px rgba(0,0,0,0.1);
+            border-left: 1px solid #ddd;
+        }
+
+        .page.right {
+            box-shadow: inset 10px 0 30px rgba(0,0,0,0.1);
+            border-right: 1px solid #ddd;
+        }
+
+        .page:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Page Content */
+        .page-content {
+            width: 100%;
+            height: 100%;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .page-content img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 5px;
+        }
+
+        /* Page Number */
+        .page-number {
+            position: absolute;
+            bottom: 20px;
+            font-size: 14px;
+            color: #666;
+            font-weight: bold;
+        }
+
+        .page.left .page-number {
+            right: 20px;
+        }
+
+        .page.right .page-number {
+            left: 20px;
+        }
+
+        /* Hidden Pages Storage */
+        .pages-storage {
+            display: none;
+        }
+
+        /* Header */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .title {
+            color: white;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title::before {
+            content: "📖";
+            font-size: 32px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Navigation */
+        .nav-container {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-indicator {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            padding: 10px 25px;
+            border-radius: 30px;
+            color: white;
+            font-size: 16px;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        /* Thumbnails Grid */
+        .thumbnails-container {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            max-width: 80%;
+            overflow-x: auto;
+            z-index: 90;
+        }
+
+        .thumbnail {
+            min-width: 60px;
+            height: 80px;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            overflow: hidden;
+            background: white;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumbnail.active {
+            border-color: #667eea;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
+        }
+
+        .thumbnail:hover {
+            border-color: #764ba2;
+            transform: translateY(-3px);
+        }
+
+        /* Zoom Container */
+        .zoom-container {
+            position: absolute;
+            top: 50%;
+            left: 40px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+
+        /* Page Flip Animation */
+        @keyframes flipLeft {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(-180deg); }
+        }
+
+        @keyframes flipRight {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(180deg); }
+        }
+
+        .flipping-left {
+            animation: flipLeft 0.6s ease-in-out;
+        }
+
+        .flipping-right {
+            animation: flipRight 0.6s ease-in-out;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .pages-container {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .page {
+                width: 100%;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .thumbnails-container {
+                bottom: 120px;
+                max-width: 95%;
+            }
+
+            .zoom-container {
+                left: 10px;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1 class="title">کاتالوگ دیجیتال</h1>
+        <div class="controls">
+            <button class="btn" onclick="toggleThumbnails()">نمایش بندانگشتی</button>
+            <button class="btn" onclick="toggleFullscreen()">تمام صفحه</button>
+            <button class="btn" onclick="toggleViewMode()">تک صفحه / دو صفحه</button>
+        </div>
+    </div>
+
+    <!-- Main Book Container -->
+    <div class="book-container">
+        <div class="book">
+            <div class="pages-container" id="pagesContainer">
+                <div class="page left" id="leftPage">
+                    <div class="page-content" id="leftContent"></div>
+                    <span class="page-number" id="leftPageNum"></span>
+                </div>
+                <div class="page right" id="rightPage">
+                    <div class="page-content" id="rightContent"></div>
+                    <span class="page-number" id="rightPageNum"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="zoom-container">
+        <button class="zoom-btn" onclick="zoomIn()">+</button>
+        <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+        <button class="zoom-btn" onclick="zoomOut()">−</button>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-container">
+        <button class="nav-btn" onclick="prevPage()" id="prevBtn">→</button>
+        <div class="page-indicator">
+            صفحه <span id="currentPage">۱-۲</span> از <span id="totalPages">۱۰</span>
+        </div>
+        <button class="nav-btn" onclick="nextPage()" id="nextBtn">←</button>
+    </div>
+
+    <!-- Thumbnails -->
+    <div class="thumbnails-container" id="thumbnailsContainer">
+        <!-- Thumbnails will be generated here -->
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Hidden Pages Storage -->
+    <div class="pages-storage">
+       
+        <div class="catalog-page" data-page="3">
+            <img src="/images/P (1).jpg" alt="">
+        </div>
+        <div class="catalog-page" data-page="4">
+            <img src="/images/P (43).JPG" alt="">
+        </div>
+        <div class="catalog-page" data-page="5">
+            <img src="/images/P (44).JPG" alt="">
+        </div>
+        <div class="catalog-page" data-page="6">
+            <img src="/images/P (45).JPG" alt="">
+        </div>
+        <div class="catalog-page" data-page="7">
+            <img src="/images/P (46).JPG" alt="">
+        </div>
+        <div class="catalog-page" data-page="8">
+            <img src="/images/P (47).JPG" alt="">
+        </div>
+        <div class="catalog-page" data-page="9">
+            <img src="/images/P (48).JPG" alt="">
+        </div>
+        
+    </div>
+
+    <script>
+        // Global Variables
+        let currentSpread = 0; // Current page spread (0 = pages 1-2, 1 = pages 3-4, etc.)
+        let totalPages = 10;
+        let zoomLevel = 1;
+        let viewMode = 'double'; // 'double' or 'single'
+        let thumbnailsVisible = true;
+        
+        // Get all catalog pages
+        const catalogPages = document.querySelectorAll('.catalog-page');
+        totalPages = catalogPages.length;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTotalPages();
+            generateThumbnails();
+            loadPages();
+            updateNavigation();
+        });
+        
+        // Generate Thumbnails
+        function generateThumbnails() {
+            const container = document.getElementById('thumbnailsContainer');
+            container.innerHTML = '';
+            
+            catalogPages.forEach((page, index) => {
+                const thumb = document.createElement('div');
+                thumb.className = 'thumbnail';
+                thumb.onclick = () => goToPage(index);
+                
+                const img = page.querySelector('img').cloneNode(true);
+                thumb.appendChild(img);
+                container.appendChild(thumb);
+            });
+        }
+        
+        // Load Pages
+        function loadPages() {
+            showLoading();
+            
+            setTimeout(() => {
+                const leftContent = document.getElementById('leftContent');
+                const rightContent = document.getElementById('rightContent');
+                const leftPageNum = document.getElementById('leftPageNum');
+                const rightPageNum = document.getElementById('rightPageNum');
+                
+                leftContent.innerHTML = '';
+                rightContent.innerHTML = '';
+                
+                if (viewMode === 'double') {
+                    const leftIndex = currentSpread * 2;
+                    const rightIndex = leftIndex + 1;
+                    
+                    // Load left page
+                    if (leftIndex < totalPages) {
+                        const leftImg = catalogPages[leftIndex].querySelector('img').cloneNode(true);
+                        leftContent.appendChild(leftImg);
+                        leftPageNum.textContent = persianNumber(leftIndex + 1);
+                    }
+                    
+                    // Load right page
+                    if (rightIndex < totalPages) {
+                        const rightImg = catalogPages[rightIndex].querySelector('img').cloneNode(true);
+                        rightContent.appendChild(rightImg);
+                        rightPageNum.textContent = persianNumber(rightIndex + 1);
+                        document.getElementById('rightPage').style.display = 'flex';
+                    } else {
+                        document.getElementById('rightPage').style.display = 'none';
+                    }
+                    
+                    updatePageIndicator(leftIndex + 1, rightIndex + 1);
+                } else {
+                    // Single page mode
+                    const pageIndex = currentSpread;
+                    if (pageIndex < totalPages) {
+                        const img = catalogPages[pageIndex].querySelector('img').cloneNode(true);
+                        leftContent.appendChild(img);
+                        leftPageNum.textContent = persianNumber(pageIndex + 1);
+                    }
+                    document.getElementById('rightPage').style.display = 'none';
+                    updatePageIndicator(pageIndex + 1);
+                }
+                
+                updateActiveThumbnails();
+                hideLoading();
+            }, 300);
+        }
+        
+        // Navigation Functions
+        function nextPage() {
+            if (viewMode === 'double') {
+                if (currentSpread < Math.ceil(totalPages / 2) - 1) {
+                    animatePageFlip('next');
+                    currentSpread++;
+                    loadPages();
+                    updateNavigation();
+                }
+            } else {
+                if (currentSpread < totalPages - 1) {
+                    animatePageFlip('next');
+                    currentSpread++;
+                    loadPages();
+                    updateNavigation();
+                }
+            }
+        }
+        
+        function prevPage() {
+            if (currentSpread > 0) {
+                animatePageFlip('prev');
+                currentSpread--;
+                loadPages();
+                updateNavigation();
+            }
+        }
+        
+        function goToPage(pageIndex) {
+            if (viewMode === 'double') {
+                currentSpread = Math.floor(pageIndex / 2);
+            } else {
+                currentSpread = pageIndex;
+            }
+            loadPages();
+            updateNavigation();
+        }
+        
+        // Update Functions
+        function updateNavigation() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            prevBtn.disabled = currentSpread === 0;
+            
+            if (viewMode === 'double') {
+                nextBtn.disabled = currentSpread >= Math.ceil(totalPages / 2) - 1;
+            } else {
+                nextBtn.disabled = currentSpread >= totalPages - 1;
+            }
+        }
+        
+        function updatePageIndicator(leftPage, rightPage) {
+            const indicator = document.getElementById('currentPage');
+            if (viewMode === 'double' && rightPage && rightPage <= totalPages) {
+                indicator.textContent = `${persianNumber(leftPage)}-${persianNumber(rightPage)}`;
+            } else {
+                indicator.textContent = persianNumber(leftPage);
+            }
+        }
+        
+        function updateTotalPages() {
+            document.getElementById('totalPages').textContent = persianNumber(totalPages);
+        }
+        
+        function updateActiveThumbnails() {
+            const thumbnails = document.querySelectorAll('.thumbnail');
+            thumbnails.forEach((thumb, index) => {
+                thumb.classList.remove('active');
+                
+                if (viewMode === 'double') {
+                    const leftIndex = currentSpread * 2;
+                    const rightIndex = leftIndex + 1;
+                    if (index === leftIndex || index === rightIndex) {
+                        thumb.classList.add('active');
+                    }
+                } else {
+                    if (index === currentSpread) {
+                        thumb.classList.add('active');
+                    }
+                }
+            });
+        }
+        
+        // Zoom Functions
+        function zoomIn() {
+            if (zoomLevel < 2) {
+                zoomLevel += 0.25;
+                applyZoom();
+            }
+        }
+        
+        function zoomOut() {
+            if (zoomLevel > 0.5) {
+                zoomLevel -= 0.25;
+                applyZoom();
+            }
+        }
+        
+        function resetZoom() {
+            zoomLevel = 1;
+            applyZoom();
+        }
+        
+        function applyZoom() {
+            const pagesContainer = document.getElementById('pagesContainer');
+            pagesContainer.style.transform = `scale(${zoomLevel})`;
+        }
+        
+        // Toggle Functions
+        function toggleThumbnails() {
+            const container = document.getElementById('thumbnailsContainer');
+            thumbnailsVisible = !thumbnailsVisible;
+            container.style.display = thumbnailsVisible ? 'flex' : 'none';
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        function toggleViewMode() {
+            if (viewMode === 'double') {
+                viewMode = 'single';
+                currentSpread = currentSpread * 2; // Adjust to single page
+            } else {
+                viewMode = 'double';
+                currentSpread = Math.floor(currentSpread / 2); // Adjust to spread
+            }
+            loadPages();
+            updateNavigation();
+        }
+        
+        // Animation Functions
+        function animatePageFlip(direction) {
+            const leftPage = document.getElementById('leftPage');
+            const rightPage = document.getElementById('rightPage');
+            
+            if (direction === 'next') {
+                rightPage.classList.add('flipping-right');
+                setTimeout(() => {
+                    rightPage.classList.remove('flipping-right');
+                }, 600);
+            } else {
+                leftPage.classList.add('flipping-left');
+                setTimeout(() => {
+                    leftPage.classList.remove('flipping-left');
+                }, 600);
+            }
+        }
+        
+        // Loading Functions
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+        
+        // Utility Functions
+        function persianNumber(num) {
+            const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            return num.toString().replace(/\d/g, digit => persianDigits[digit]);
+        }
+        
+        // Keyboard Navigation
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    nextPage();
+                    break;
+                case 'ArrowRight':
+                    prevPage();
+                    break;
+                case '+':
+                case '=':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+                case '0':
+                    resetZoom();
+                    break;
+                case 'f':
+                case 'F':
+                    toggleFullscreen();
+                    break;
+                case 't':
+                case 'T':
+                    toggleThumbnails();
+                    break;
+            }
+        });
+        
+        // Touch/Swipe Support for Mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            if (touchEndX < touchStartX - 50) {
+                nextPage(); // Swipe left
+            }
+            if (touchEndX > touchStartX + 50) {
+                prevPage(); // Swipe right
+            }
+        }
+    </script>
+</body>
+</html>

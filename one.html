@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalog Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            direction: rtl;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .control-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            background: #f7f7f7;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Main Content */
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Sidebar Thumbnails */
+        .sidebar {
+            width: 200px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+
+        .thumbnail {
+            width: 100%;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            display: block;
+            border-radius: 3px;
+        }
+
+        .thumbnail.active {
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        .thumbnail:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        /* Viewer Area */
+        .viewer-container {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .viewer-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .page-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+            cursor: grab;
+        }
+
+        .page-image.zoomed {
+            cursor: zoom-out;
+        }
+
+        /* Navigation Arrows */
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .nav-arrow:hover {
+            background: rgba(90, 103, 216, 1);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .nav-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-arrow.prev {
+            left: 20px;
+        }
+
+        .nav-arrow.next {
+            right: 20px;
+        }
+
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .zoom-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .zoom-btn:hover {
+            background: #5a67d8;
+            transform: scale(1.1);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 150px;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .sidebar h3 {
+                display: none;
+            }
+
+            .thumbnail-container {
+                display: flex;
+                overflow-x: auto;
+                gap: 10px;
+                padding-bottom: 10px;
+            }
+
+            .thumbnail {
+                min-width: 100px;
+                margin-bottom: 0;
+            }
+
+            .nav-arrow {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+
+            .nav-arrow.prev {
+                left: 10px;
+            }
+
+            .nav-arrow.next {
+                right: 10px;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        /* Fullscreen Mode */
+        .fullscreen-btn {
+            background: transparent;
+            border: 2px solid #667eea;
+            color: #667eea;
+        }
+
+        .fullscreen-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .page-image {
+            animation: fadeIn 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+      <div class="header">
+        <h1>📚 نمایشگر کاتالوگ</h1>
+        <div class="controls">
+            <span class="page-info">
+                صفحه <span id="currentPage">۱</span> از <span id="totalPages">۶</span>
+            </span>
+            <button class="control-btn" onclick="toggleThumbnails()">
+                <span>📑</span> بندانگشتی
+            </button>
+            <button class="control-btn fullscreen-btn" onclick="toggleFullscreen()">
+                <span>⛶</span> تمام صفحه
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar with Thumbnails -->
+        <div class="sidebar" id="sidebar">
+            <h3>صفحات</h3>
+            <div class="thumbnail-container" id="thumbnailContainer"></div>
+        </div>
+
+        <!-- Viewer Container -->
+        <div class="viewer-container">
+            <div class="viewer-wrapper" id="viewerWrapper">
+                <img src="" alt="صفحه کاتالوگ" class="page-image" id="mainImage">
+                <div class="loading" id="loading">در حال بارگذاری...</div>
+            </div>
+
+            <!-- Navigation Arrows -->
+            <button class="nav-arrow prev" onclick="prevPage()" id="prevBtn">›</button>
+            <button class="nav-arrow next" onclick="nextPage()" id="nextBtn">‹</button>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomOut()">−</button>
+                <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+                <button class="zoom-btn" onclick="zoomIn()">+</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Catalog Configuration
+        const catalog = {
+            currentPage: 1,
+            totalPages: 10,
+            zoomLevel: 1,
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            scrollLeft: 0,
+            scrollTop: 0
+        };
+
+        // Sample image URLs - Replace with your actual image URLs
+        const pageImages = [
+            './images/P (1).jpg',
+             './images/P (43).jpg',
+              './images/P (44).jpg',
+               './images/P (1).jpg',
+                './images/P (1).jpg',
+                 './images/P (1).jpg',
+                  './images/P (1).jpg',
+                   './images/P (1).jpg',
+
+           
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            catalog.totalPages = pageImages.length;
+            document.getElementById('totalPages').textContent = catalog.totalPages;
+            
+            generateThumbnails();
+            loadPage(1);
+            setupDragScroll();
+            setupKeyboardNavigation();
+        });
+
+        // Generate Thumbnails
+        function generateThumbnails() {
+            const container = document.getElementById('thumbnailContainer');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < pageImages.length; i++) {
+                const thumb = document.createElement('div');
+                thumb.className = 'thumbnail';
+                thumb.onclick = () => loadPage(i + 1);
+                
+                const img = document.createElement('img');
+                img.src = pageImages[i];
+                img.alt = `Page ${i + 1}`;
+                
+                const pageNum = document.createElement('span');
+                pageNum.className = 'page-number';
+                pageNum.textContent = i + 1;
+                
+                thumb.appendChild(img);
+                thumb.appendChild(pageNum);
+                container.appendChild(thumb);
+            }
+        }
+
+        // Load Page
+        function loadPage(pageNumber) {
+            if (pageNumber < 1 || pageNumber > catalog.totalPages) return;
+            
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            
+            catalog.currentPage = pageNumber;
+            const mainImage = document.getElementById('mainImage');
+            
+            // Simulate loading delay
+            setTimeout(() => {
+                mainImage.src = pageImages[pageNumber - 1];
+                document.getElementById('currentPage').textContent = pageNumber;
+                
+                // Update thumbnails
+                updateActiveThumbnail();
+                
+                // Update navigation buttons
+                updateNavButtons();
+                
+                // Reset zoom
+                resetZoom();
+                
+                // Hide loading
+                document.getElementById('loading').classList.remove('active');
+                
+                // Scroll thumbnail into view
+                scrollThumbnailIntoView(pageNumber - 1);
+            }, 300);
+        }
+
+        // Update Active Thumbnail
+        function updateActiveThumbnail() {
+            const thumbnails = document.querySelectorAll('.thumbnail');
+            thumbnails.forEach((thumb, index) => {
+                if (index === catalog.currentPage - 1) {
+                    thumb.classList.add('active');
+                } else {
+                    thumb.classList.remove('active');
+                }
+            });
+        }
+
+        // Scroll Thumbnail Into View
+        function scrollThumbnailIntoView(index) {
+            const thumbnails = document.querySelectorAll('.thumbnail');
+            if (thumbnails[index]) {
+                thumbnails[index].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+        }
+
+        // Navigation
+        function prevPage() {
+            if (catalog.currentPage > 1) {
+                loadPage(catalog.currentPage - 1);
+            }
+        }
+
+        function nextPage() {
+            if (catalog.currentPage < catalog.totalPages) {
+                loadPage(catalog.currentPage + 1);
+            }
+        }
+
+        function updateNavButtons() {
+            document.getElementById('prevBtn').disabled = catalog.currentPage === 1;
+            document.getElementById('nextBtn').disabled = catalog.currentPage === catalog.totalPages;
+        }
+
+        // Zoom Functions
+        function zoomIn() {
+            if (catalog.zoomLevel < 3) {
+                catalog.zoomLevel += 0.25;
+                applyZoom();
+            }
+        }
+
+        function zoomOut() {
+            if (catalog.zoomLevel > 0.5) {
+                catalog.zoomLevel -= 0.25;
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            catalog.zoomLevel = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const mainImage = document.getElementById('mainImage');
+            mainImage.style.transform = `scale(${catalog.zoomLevel})`;
+            
+            if (catalog.zoomLevel > 1) {
+                mainImage.classList.add('zoomed');
+                mainImage.style.cursor = 'move';
+            } else {
+                mainImage.classList.remove('zoomed');
+                mainImage.style.cursor = 'grab';
+            }
+        }
+
+        // Toggle Thumbnails
+        function toggleThumbnails() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.style.display === 'none') {
+                sidebar.style.display = 'block';
+            } else {
+                sidebar.style.display = 'none';
+            }
+        }
+
+        // Toggle Fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Drag to Scroll (when zoomed)
+        function setupDragScroll() {
+            const viewerWrapper = document.getElementById('viewerWrapper');
+            const mainImage = document.getElementById('mainImage');
+
+            mainImage.addEventListener('mousedown', (e) => {
+                if (catalog.zoomLevel > 1) {
+                    catalog.isDragging = true;
+                    catalog.startX = e.pageX - viewerWrapper.offsetLeft;
+                    catalog.startY = e.pageY - viewerWrapper.offsetTop;
+                    catalog.scrollLeft = viewerWrapper.scrollLeft;
+                    catalog.scrollTop = viewerWrapper.scrollTop;
+                    mainImage.style.cursor = 'grabbing';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                catalog.isDragging = false;
+                if (catalog.zoomLevel > 1) {
+                    mainImage.style.cursor = 'move';
+                }
+            });
+
+            viewerWrapper.addEventListener('mousemove', (e) => {
+                if (!catalog.isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - viewerWrapper.offsetLeft;
+                const y = e.pageY - viewerWrapper.offsetTop;
+                const walkX = (x - catalog.startX) * 2;
+                const walkY = (y - catalog.startY) * 2;
+                viewerWrapper.scrollLeft = catalog.scrollLeft - walkX;
+                viewerWrapper.scrollTop = catalog.scrollTop - walkY;
+            });
+        }
+
+        // Keyboard Navigation
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        prevPage();
+                        break;
+                    case 'ArrowRight':
+                        nextPage();
+                        break;
+                    case '+':
+                    case '=':
+                        zoomIn();
+                        break;
+                    case '-':
+                    case '_':
+                        zoomOut();
+                        break;
+                    case '0':
+                        resetZoom();
+                        break;
+                    case 'f':
+                    case 'F':
+                        toggleFullscreen();
+                        break;
+                }
+            });
+        }
+
+        // Double-click to zoom
+        document.getElementById('mainImage').addEventListener('dblclick', () => {
+            if (catalog.zoomLevel === 1) {
+                catalog.zoomLevel = 2;
+            } else {
+                catalog.zoomLevel = 1;
+            }
+            applyZoom();
+        });
+    </script>
+</body>
+</html>

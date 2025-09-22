@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نمایشگر تصویر</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            direction: rtl;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* File Upload Area */
+        .upload-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+        }
+
+        .upload-container.hidden {
+            display: none;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 40px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        }
+
+        .upload-area.dragover {
+            border-color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            color: #666;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* Main Viewer Container */
+        .viewer-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            padding: 20px;
+            gap: 20px;
+            display: none;
+        }
+
+        .viewer-container.active {
+            display: flex;
+        }
+
+        /* Sidebar Thumbnails */
+        .sidebar {
+            width: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+        }
+
+        .sidebar h3 {
+            color: white;
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .thumbnail {
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s;
+            position: relative;
+            background: white;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .thumbnail.active {
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .thumbnail:hover {
+            transform: scale(1.05);
+            border-color: #764ba2;
+        }
+
+        .thumbnail-number {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* Main Image Area */
+        .image-container {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden; /* Allow panning */
+        }
+
+        #mainImage {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Ensure entire image is visible by default */
+            cursor: grab;
+            transition: transform 0.1s ease-out; /* Smooth zoom/pan */
+            transform-origin: center center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        /* Navigation */
+        .nav-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 30px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            color: white;
+            font-size: 16px;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .zoom-level {
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            margin: 5px 0;
+        }
+
+        /* Loading Spinner */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Page Input (now Image Index Input) */
+        .page-input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .page-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Sample Image Button */
+        .sample-btn {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .sample-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .zoom-controls {
+                flex-direction: row;
+                left: 50%;
+                top: auto;
+                bottom: 100px;
+                transform: translateX(-50%);
+            }
+
+            .nav-container {
+                padding: 10px 20px;
+            }
+
+            .upload-container {
+                width: 90%;
+                padding: 20px;
+            }
+
+            .upload-area {
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>🖼️ نمایشگر تصویر</h1>
+        <div class="controls">
+            <button class="btn" onclick="toggleThumbnails()">🖼️ بندانگشتی‌ها</button>
+            <button class="btn" onclick="toggleFullscreen()">⛶ تمام صفحه</button>
+            <button class="btn" onclick="loadNewImage()">📁 تصویر جدید</button>
+        </div>
+    </div>
+
+    <!-- Upload Container -->
+    <div class="upload-container" id="uploadContainer">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📸</div>
+            <div class="upload-text">فایل‌های تصویر خود را انتخاب کنید</div>
+            <div class="upload-subtext">یا فایل‌ها را اینجا رها کنید</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" multiple>
+        <button class="sample-btn" onclick="loadSampleImages()">بارگذاری تصاویر نمونه</button>
+    </div>
+
+    <!-- Main Viewer -->
+    <div class="viewer-container" id="viewerContainer">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <h3>تصاویر</h3>
+            <div id="thumbnailContainer"></div>
+        </div>
+
+        <!-- Image Container -->
+        <div class="image-container">
+            <img id="mainImage" src="" alt="تصویر اصلی">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <div class="zoom-level" id="zoomLevel">100%</div>
+            <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-container" id="navContainer" style="display: none;">
+        <button class="nav-btn" id="prevBtn" onclick="prevImage()">→</button>
+        <div class="page-info">
+            <div class="page-input-container">
+                تصویر
+                <input type="number" class="page-input" id="imageInput" min="1" onchange="goToImage(this.value)">
+                از <span id="totalImages">0</span>
+            </div>
+        </div>
+        <button class="nav-btn" id="nextBtn" onclick="nextImage()">←</button>
+    </div>
+
+    <script>
+        // Global variables
+        let imageFiles = [];
+        let currentImageIndex = 0;
+        let scale = 1; // Initial zoom scale for images
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let startX, startY;
+
+        // Get elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadContainer = document.getElementById('uploadContainer');
+        const viewerContainer = document.getElementById('viewerContainer');
+        const navContainer = document.getElementById('navContainer');
+        const mainImage = document.getElementById('mainImage');
+        const imageContainer = document.querySelector('.image-container');
+
+        // Upload area click
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                loadImages(files);
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            if (files.length > 0) {
+                loadImages(files);
+            }
+        });
+
+        // Load Images
+        function loadImages(files) {
+            imageFiles = files;
+            currentImageIndex = 0;
+            document.getElementById('totalImages').textContent = persianNumber(imageFiles.length);
+            
+            // Hide upload container, show viewer
+            uploadContainer.classList.add('hidden');
+            viewerContainer.classList.add('active');
+            navContainer.style.display = 'flex';
+            
+            generateThumbnails();
+            renderImage(currentImageIndex);
+            updateNavigation();
+            resetImagePosition();
+        }
+
+        // Load sample images
+        function loadSampleImages() {
+            const sampleUrls = [
+                'https://via.placeholder.com/1024x768/FF5733/FFFFFF?text=Sample+Image+1',
+                'https://via.placeholder.com/800x600/33FF57/FFFFFF?text=Sample+Image+2',
+                'https://via.placeholder.com/1200x900/3357FF/FFFFFF?text=Sample+Image+3'
+            ];
+            
+            // Create dummy File objects for consistency, though we'll use URLs directly
+            imageFiles = sampleUrls.map((url, index) => {
+                const parts = url.split('/');
+                const filename = parts[parts.length - 1].split('?')[0] + '.png'; // Extract a dummy filename
+                return new File([], filename, { type: 'image/png', url: url }); // Store URL in a custom property
+            });
+
+            currentImageIndex = 0;
+            document.getElementById('totalImages').textContent = persianNumber(imageFiles.length);
+
+            uploadContainer.classList.add('hidden');
+            viewerContainer.classList.add('active');
+            navContainer.style.display = 'flex';
+
+            generateThumbnails(true); // Pass true to indicate sample images for URL handling
+            renderImage(currentImageIndex);
+            updateNavigation();
+            resetImagePosition();
+
+        }
+
+        // Render current image
+        function renderImage(index) {
+            if (imageFiles.length === 0) return;
+
+            showLoading();
+            resetZoom();
+            resetImagePosition();
+
+            const file = imageFiles[index];
+            let imageUrl;
+
+            if (file.url) { // Handle sample images with direct URLs
+                imageUrl = file.url;
+            } else { // Handle user-uploaded files
+                imageUrl = URL.createObjectURL(file);
+            }
+
+            mainImage.src = imageUrl;
+            mainImage.onload = () => {
+                hideLoading();
+                updateActiveThumbnail();
+                document.getElementById('imageInput').value = index + 1;
+                // Revoke object URL if it's a user-uploaded file to free memory
+                if (!file.url) URL.revokeObjectURL(imageUrl);
+            };
+            mainImage.onerror = () => {
+                hideLoading();
+                alert('خطا در بارگذاری تصویر. فایل ممکن است آسیب دیده باشد.');
+                // Revoke object URL even on error
+                if (!file.url) URL.revokeObjectURL(imageUrl);
+            };
+        }
+
+        // Generate thumbnails
+        function generateThumbnails(isSample = false) {
+            const container = document.getElementById('thumbnailContainer');
+            container.innerHTML = '';
+            thumbnails = []; // Clear previous thumbnails
+
+            imageFiles.forEach((file, index) => {
+                const thumbDiv = document.createElement('div');
+                thumbDiv.className = 'thumbnail';
+                thumbDiv.onclick = () => goToImage(index + 1);
+                
+                const thumbImg = document.createElement('img');
+                
+                let imageUrl;
+                if (isSample && file.url) {
+                    imageUrl = file.url;
+                } else {
+                    imageUrl = URL.createObjectURL(file);
+                }
+
+                thumbImg.src = imageUrl;
+                thumbImg.onload = () => {
+                    // Revoke object URL if it's a user-uploaded file and not a sample URL
+                    if (!isSample || !file.url) URL.revokeObjectURL(imageUrl);
+                };
+                thumbImg.onerror = () => {
+                    thumbImg.src = 'https://via.placeholder.com/60x40/FF0000/FFFFFF?text=Error'; // Error placeholder
+                    if (!isSample || !file.url) URL.revokeObjectURL(imageUrl);
+                };
+
+                const pageNumber = document.createElement('div');
+                pageNumber.className = 'thumbnail-number';
+                pageNumber.textContent = persianNumber(index + 1);
+                
+                thumbDiv.appendChild(thumbImg);
+                thumbDiv.appendChild(pageNumber);
+                container.appendChild(thumbDiv);
+                
+                thumbnails.push(thumbDiv);
+            });
+        }
+
+        // Navigation functions
+        function prevImage() {
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                renderImage(currentImageIndex);
+                updateNavigation();
+            }
+        }
+
+        function nextImage() {
+            if (currentImageIndex < imageFiles.length - 1) {
+                currentImageIndex++;
+                renderImage(currentImageIndex);
+                updateNavigation();
+            }
+        }
+
+        function goToImage(imgNum) {
+            imgNum = parseInt(imgNum) - 1; // Convert to 0-based index
+            if (imgNum >= 0 && imgNum < imageFiles.length) {
+                currentImageIndex = imgNum;
+                renderImage(currentImageIndex);
+                updateNavigation();
+            }
+        }
+
+        function updateNavigation() {
+            document.getElementById('prevBtn').disabled = currentImageIndex === 0;
+            document.getElementById('nextBtn').disabled = currentImageIndex === imageFiles.length - 1;
+            document.getElementById('imageInput').value = currentImageIndex + 1;
+        }
+
+        function updateActiveThumbnail() {
+            thumbnails.forEach((thumb, index) => {
+                if (index === currentImageIndex) {
+                    thumb.classList.add('active');
+                    thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    thumb.classList.remove('active');
+                }
+            });
+        }
+
+        // Zoom functions
+        function applyTransform() {
+            mainImage.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        }
+
+        function zoomIn() {
+            if (scale < 5) { // Max zoom 5x
+                scale += 0.25;
+                applyTransform();
+                updateZoomLevel();
+            }
+        }
+
+        function zoomOut() {
+            if (scale > 0.25) { // Min zoom 0.25x
+                scale -= 0.25;
+                applyTransform();
+                updateZoomLevel();
+            }
+        }
+
+        function resetZoom() {
+            scale = 1;
+            updateZoomLevel();
+            applyTransform(); // Apply transform even with reset zoom
+        }
+
+        function resetImagePosition() {
+            offsetX = 0;
+            offsetY = 0;
+            applyTransform();
+        }
+
+        function updateZoomLevel() {
+            document.getElementById('zoomLevel').textContent = Math.round(scale * 100) + '%';
+        }
+
+        // Panning functionality
+        mainImage.addEventListener('mousedown', (e) => {
+            if (scale > 1) { // Only allow dragging if zoomed in
+                e.preventDefault();
+                isDragging = true;
+                mainImage.style.cursor = 'grabbing';
+                startX = e.clientX - offsetX;
+                startY = e.clientY - offsetY;
+            }
+        });
+
+        imageContainer.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            offsetX = e.clientX - startX;
+            offsetY = e.clientY - startY;
+            applyTransform();
+        });
+
+        imageContainer.addEventListener('mouseup', () => {
+            isDragging = false;
+            mainImage.style.cursor = 'grab';
+        });
+
+        imageContainer.addEventListener('mouseleave', () => {
+            isDragging = false;
+            mainImage.style.cursor = 'grab';
+        });
+
+        // Toggle functions
+        function toggleThumbnails() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function loadNewImage() {
+            uploadContainer.classList.remove('hidden');
+            viewerContainer.classList.remove('active');
+            navContainer.style.display = 'none';
+            fileInput.value = ''; // Clear file input
+            imageFiles = [];
+            currentImageIndex = 0;
+            mainImage.src = ''; // Clear main image
+            document.getElementById('thumbnailContainer').innerHTML = ''; // Clear thumbnails
+            resetZoom();
+            resetImagePosition();
+        }
+
+        // Loading functions
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        // Utility functions
+        function persianNumber(num) {
+            const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+            return num.toString().replace(/\d/g, digit => persianDigits[digit]);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (imageFiles.length === 0) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft': // Next image (since it's RTL, left arrow means next in sequence)
+                    nextImage();
+                    break;
+                case 'ArrowRight': // Previous image
+                    prevImage();
+                    break;
+                case '+':
+                case '=':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+                case '0':
+                    resetZoom();
+                    resetImagePosition();
+                    break;
+                case 'f':
+                case 'F':
+                    toggleFullscreen();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
