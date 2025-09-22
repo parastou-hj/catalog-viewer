@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <title>نمایشگر کاتالوگ - طرح کتاب</title>
     <style>
         * {
@@ -455,155 +456,186 @@
     <!-- Hidden Pages Storage -->
     <div class="pages-storage">
        
-        <div class="catalog-page" data-page="3">
-            <img src="/images/P (1).jpg" alt="">
+        <div class="catalog-page" id="pdfPagesStorage">
+           
         </div>
-        <div class="catalog-page" data-page="4">
-            <img src="/images/P (43).JPG" alt="">
-        </div>
-        <div class="catalog-page" data-page="5">
-            <img src="/images/P (44).JPG" alt="">
-        </div>
-        <div class="catalog-page" data-page="6">
-            <img src="/images/P (45).JPG" alt="">
-        </div>
-        <div class="catalog-page" data-page="7">
-            <img src="/images/P (46).JPG" alt="">
-        </div>
-        <div class="catalog-page" data-page="8">
-            <img src="/images/P (47).JPG" alt="">
-        </div>
-        <div class="catalog-page" data-page="9">
-            <img src="/images/P (48).JPG" alt="">
-        </div>
-        
+  
     </div>
 
     <script>
-        // Global Variables
-        let currentSpread = 0; // Current page spread (0 = pages 1-2, 1 = pages 3-4, etc.)
-        let totalPages = 10;
-        let zoomLevel = 1;
-        let viewMode = 'double'; // 'double' or 'single'
-        let thumbnailsVisible = true;
-        
-        // Get all catalog pages
-        const catalogPages = document.querySelectorAll('.catalog-page');
-        totalPages = catalogPages.length;
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            updateTotalPages();
-            generateThumbnails();
-            loadPages();
-            updateNavigation();
-        });
-        
-        // Generate Thumbnails
-        function generateThumbnails() {
-            const container = document.getElementById('thumbnailsContainer');
-            container.innerHTML = '';
-            
-            catalogPages.forEach((page, index) => {
-                const thumb = document.createElement('div');
-                thumb.className = 'thumbnail';
-                thumb.onclick = () => goToPage(index);
-                
-                const img = page.querySelector('img').cloneNode(true);
-                thumb.appendChild(img);
-                container.appendChild(thumb);
+      // Global Variables
+let currentSpread = 0;
+let totalPages = 0; // این مقدار پس از بارگذاری PDF تنظیم می‌شود
+let zoomLevel = 1;
+let viewMode = 'double';
+let thumbnailsVisible = true;
+let pdfDoc = null; // شیء PDFDocumentProxy از pdf.js
+const pdfUrl = './pdfs/canal.pdf'; // مسیر فایل PDF شما
+
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPdf();
+});
+
+async function loadPdf() {
+    showLoading();
+    try {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+
+        updateTotalPages();
+        await generatePdfThumbnails(); // تغییر برای PDF
+        await renderPages(); // تغییر برای PDF
+        updateNavigation();
+        hideLoading();
+    } catch (error) {
+        console.error('Error loading PDF:', error);
+        alert('خطا در بارگذاری فایل PDF!');
+        hideLoading();
+    }
+}
+
+async function generatePdfThumbnails() {
+    const container = document.getElementById('thumbnailsContainer');
+    container.innerHTML = '';
+
+    for (let i = 1; i <= totalPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 0.2 }); // مقیاس کوچک برای بندانگشتی
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+
+        const thumb = document.createElement('div');
+        thumb.className = 'thumbnail';
+        thumb.onclick = () => goToPage(i - 1); // صفحات از 0 شروع می شوند
+        thumb.appendChild(canvas);
+        container.appendChild(thumb);
+    }
+}
+
+async function renderPages() {
+    showLoading();
+    const leftContent = document.getElementById('leftContent');
+    const rightContent = document.getElementById('rightContent');
+    const leftPageNum = document.getElementById('leftPageNum');
+    const rightPageNum = document.getElementById('rightPageNum');
+
+    leftContent.innerHTML = '';
+    rightContent.innerHTML = '';
+
+    const renderSinglePage = async (pageIndex, targetContent, targetPageNum) => {
+        if (pageIndex >= 0 && pageIndex < totalPages) {
+            const page = await pdfDoc.getPage(pageIndex + 1); // صفحات PDF از 1 شروع می شوند
+            const viewport = page.getViewport({ scale: 1.5 * zoomLevel }); // مقیاس اصلی
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderTask = page.render({
+                canvasContext: context,
+                viewport: viewport
             });
+            await renderTask.promise;
+            targetContent.appendChild(canvas);
+            targetPageNum.textContent = persianNumber(pageIndex + 1);
+        } else {
+            targetContent.innerHTML = ''; // صفحه خالی
+            targetPageNum.textContent = '';
         }
-        
-        // Load Pages
-        function loadPages() {
-            showLoading();
-            
-            setTimeout(() => {
-                const leftContent = document.getElementById('leftContent');
-                const rightContent = document.getElementById('rightContent');
-                const leftPageNum = document.getElementById('leftPageNum');
-                const rightPageNum = document.getElementById('rightPageNum');
-                
-                leftContent.innerHTML = '';
-                rightContent.innerHTML = '';
-                
-                if (viewMode === 'double') {
-                    const leftIndex = currentSpread * 2;
-                    const rightIndex = leftIndex + 1;
-                    
-                    // Load left page
-                    if (leftIndex < totalPages) {
-                        const leftImg = catalogPages[leftIndex].querySelector('img').cloneNode(true);
-                        leftContent.appendChild(leftImg);
-                        leftPageNum.textContent = persianNumber(leftIndex + 1);
-                    }
-                    
-                    // Load right page
-                    if (rightIndex < totalPages) {
-                        const rightImg = catalogPages[rightIndex].querySelector('img').cloneNode(true);
-                        rightContent.appendChild(rightImg);
-                        rightPageNum.textContent = persianNumber(rightIndex + 1);
-                        document.getElementById('rightPage').style.display = 'flex';
-                    } else {
-                        document.getElementById('rightPage').style.display = 'none';
-                    }
-                    
-                    updatePageIndicator(leftIndex + 1, rightIndex + 1);
-                } else {
-                    // Single page mode
-                    const pageIndex = currentSpread;
-                    if (pageIndex < totalPages) {
-                        const img = catalogPages[pageIndex].querySelector('img').cloneNode(true);
-                        leftContent.appendChild(img);
-                        leftPageNum.textContent = persianNumber(pageIndex + 1);
-                    }
-                    document.getElementById('rightPage').style.display = 'none';
-                    updatePageIndicator(pageIndex + 1);
-                }
-                
-                updateActiveThumbnails();
-                hideLoading();
-            }, 300);
-        }
-        
-        // Navigation Functions
-        function nextPage() {
-            if (viewMode === 'double') {
-                if (currentSpread < Math.ceil(totalPages / 2) - 1) {
-                    animatePageFlip('next');
-                    currentSpread++;
-                    loadPages();
-                    updateNavigation();
-                }
-            } else {
-                if (currentSpread < totalPages - 1) {
-                    animatePageFlip('next');
-                    currentSpread++;
-                    loadPages();
-                    updateNavigation();
-                }
-            }
-        }
-        
-        function prevPage() {
-            if (currentSpread > 0) {
-                animatePageFlip('prev');
-                currentSpread--;
-                loadPages();
-                updateNavigation();
-            }
-        }
-        
-        function goToPage(pageIndex) {
-            if (viewMode === 'double') {
-                currentSpread = Math.floor(pageIndex / 2);
-            } else {
-                currentSpread = pageIndex;
-            }
-            loadPages();
+    };
+
+    if (viewMode === 'double') {
+        const leftIndex = currentSpread * 2;
+        const rightIndex = leftIndex + 1;
+
+        document.getElementById('rightPage').style.display = 'flex'; // مطمئن شوید صفحه راست نمایش داده می شود
+        await renderSinglePage(leftIndex, leftContent, leftPageNum);
+        await renderSinglePage(rightIndex, rightContent, rightPageNum);
+
+        updatePageIndicator(leftIndex + 1, rightIndex + 1);
+    } else {
+        const pageIndex = currentSpread;
+        document.getElementById('rightPage').style.display = 'none';
+        await renderSinglePage(pageIndex, leftContent, leftPageNum);
+        updatePageIndicator(pageIndex + 1);
+    }
+
+    updateActiveThumbnails();
+    hideLoading();
+}
+
+// Navigation Functions (تقریباً مشابه قبل)
+function nextPage() {
+    if (viewMode === 'double') {
+        if (currentSpread < Math.ceil(totalPages / 2) - 1) {
+            animatePageFlip('next');
+            currentSpread++;
+            renderPages();
             updateNavigation();
         }
+    } else {
+        if (currentSpread < totalPages - 1) {
+            animatePageFlip('next');
+            currentSpread++;
+            renderPages();
+            updateNavigation();
+        }
+    }
+}
+
+function prevPage() {
+    if (currentSpread > 0) {
+        animatePageFlip('prev');
+        currentSpread--;
+        renderPages();
+        updateNavigation();
+    }
+}
+
+function goToPage(pageIndex) {
+    if (viewMode === 'double') {
+        currentSpread = Math.floor(pageIndex / 2);
+    } else {
+        currentSpread = pageIndex;
+    }
+    renderPages();
+    updateNavigation();
+}
+
+// Zoom Functions (نیاز به بازنگری دارد تا رندر مجدد انجام شود)
+function zoomIn() {
+    if (zoomLevel < 2) {
+        zoomLevel += 0.25;
+        renderPages(); // رندر مجدد صفحات با زوم جدید
+    }
+}
+
+function zoomOut() {
+    if (zoomLevel > 0.5) {
+        zoomLevel -= 0.25;
+        renderPages(); // رندر مجدد صفحات با زوم جدید
+    }
+}
+
+function resetZoom() {
+    zoomLevel = 1;
+    renderPages(); // رندر مجدد صفحات با زوم پیش‌فرض
+}
+
+// بقیه توابع (updateNavigation, updateTotalPages, updateActiveThumbnails, persianNumber, etc.)
+// همانند قبل می‌توانند باشند، فقط باید اطمینان حاصل کنید که renderPages() را به جای loadPages() فراخوانی می‌کنند.
+// ...
         
         // Update Functions
         function updateNavigation() {
